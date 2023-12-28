@@ -37,7 +37,9 @@ pyenv: deps  ## Create the pyenv for Python development
 	for dep in $(PYTHON_PACKAGES); do \
 	  if ! echo "$$PIP_FREEZE_OUT" | grep $$dep 2>&1 > /dev/null; then pip install $$dep; fi; \
 	done
-	python -m pip install --upgrade pip
+
+localdev: pyenv ## setup for local dev
+	hatch run pip install -e .
 
 run:  ## Run a few examples
 	hatch run amazon-invoice-downloader --year 2022
@@ -58,4 +60,5 @@ help:  ## Print list of Makefile targets
 	@grep --with-filename -E '^[a-zA-Z0-9_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
 	  cut -d ":" -f2- | \
 	  awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}' | sort
+
 

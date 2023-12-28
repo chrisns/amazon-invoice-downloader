@@ -57,7 +57,12 @@ def run(playwright, args):
     password = args.get('--password')
     if password == '$AMAZON_PASSWORD':
         password = os.environ.get('AMAZON_PASSWORD')
-
+    
+    # date_format = args.get('--email')
+    # if date_format == '$AMAZON_DATE_FORMAT':
+    #     date_format = os.environ.get('AMAZON_DATE_FORMAT')
+    # # date_format = "%B %d, %Y"
+    # date_format = "%d %B %Y"
     # Parse date ranges int start_date and end_date
     if args['--date-range']:
         start_date, end_date = args['--date-range'].split('-')
@@ -77,28 +82,18 @@ def run(playwright, args):
     os.makedirs(target_dir, exist_ok=True)
 
     # Create Playwright context with Chromium
-    browser = playwright.chromium.launch(headless=False)
-    context = browser.new_context()
+    # browser = playwright.chromium.launch(headless=False)
+    # browser = playwright.chromium.launch_persistent_context(headless=False, channel="chrome", user_data_dir="/Users/cns/Library/Application Support/Google/Chrome")
+    # context = browser.new_context()
+    browser = playwright.chromium.connect_over_cdp("http://localhost:9223")
+    context = browser.contexts[0]
 
     page = context.new_page()
-    page.goto("https://www.amazon.com/")
+    page.goto("https://www.amazon.co.uk/gp/css/order-history")
 
-    # Sometimes, we are interrupted by a bot check, so let the user solve it
-    page.wait_for_selector('span >> text=Hello, sign in', timeout=0).click()
 
-    if email:
-        page.get_by_label("Email").click()
-        page.get_by_label("Email").fill(email)
-        page.get_by_role("button", name="Continue").click()
-
-    if password:
-        page.get_by_label("Password").click()
-        page.get_by_label("Password").fill(password)
-        page.get_by_label("Keep me signed in").check()
-        page.get_by_role("button", name="Sign in").click()
-
-    page.wait_for_selector('a >> text=Returns & Orders', timeout=0).click()
-    sleep()
+    # page.wait_for_selector('a >> text=Returns & Orders', timeout=0).click()
+    # sleep()
 
     # Get a list of years from the select options
     select = page.query_selector('select#time-filter')
@@ -116,8 +111,8 @@ def run(playwright, args):
         # Select the year in the order filter
         page.query_selector('span.a-dropdown-container').click()  # Time Range Dropdown Filter
         page.get_by_role("option", name=year).click()  # Select the year (descending order, most recent first)
-        sleep()
-
+        # sleep()
+        page.wait_for_selector('ul.a-pagination')
         # Page Loop
         first_page = True
         done = False
@@ -128,22 +123,24 @@ def run(playwright, args):
                 if first_page:
                     first_page = False
                 else:
-                    page.get_by_role("link", name="Next →").click()
-                sleep()  # sleep after every page load
+                    page.query_selector('ul.a-pagination li.a-last a').click()
+                # sleep()  # sleep after every page load
             except TimeoutError:
                 # There are no more pages
                 break
 
             # Order Loop
+            page.wait_for_selector('ul.a-pagination')
+            page.wait_for_selector('.js-order-card .yohtmlc-order-id .value')
             order_cards = page.query_selector_all(".js-order-card")
             for order_card in order_cards:
                 # Parse the order card to create the date and file_name
                 spans = order_card.query_selector_all("span")
-                date = datetime.strptime(spans[1].inner_text(), "%B %d, %Y")
-                total = spans[3].inner_text().replace("$", "").replace(",", "")  # remove dollar sign and commas
-                orderid = spans[9].inner_text()
+                date = datetime.strptime(spans[1].inner_text(), "%d %B %Y")
+                total = spans[3].inner_text().replace("$", "").replace(",", "").replace("£", "")  # remove dollar sign and commas
+                # orderid = spans[9].inner_text()
+                orderid = order_card.query_selector(".yohtmlc-order-id .value").inner_text()
                 date_str = date.strftime("%Y%m%d")
-                file_name = f"{target_dir}/{date_str}_{total}_amazon_{orderid}.pdf"
 
                 if date > end_date:
                     continue
@@ -151,26 +148,30 @@ def run(playwright, args):
                     done = True
                     break
 
-                if os.path.isfile(file_name):
-                    print(f"File [{file_name}] already exists")
-                else:
-                    print(f"Saving file [{file_name}]")
-                    # Save
-                    link = "https://www.amazon.com/" + order_card.query_selector(
-                        'xpath=//a[contains(text(), "View invoice")]'
-                    ).get_attribute("href")
-                    invoice_page = context.new_page()
-                    invoice_page.goto(link)
-                    invoice_page.pdf(
-                        path=file_name,
-                        format="Letter",
-                        margin={"top": ".5in", "right": ".5in", "bottom": ".5in", "left": ".5in"},
-                    )
-                    invoice_page.close()
+                detail_page = context.new_page()
+                detail_page.goto(f"https://www.amazon.co.uk/gp/shared-cs/ajax/invoice/invoice.html?orderId={orderid}&relatedRequestId=NEEDED")
+
+                pdfs = detail_page.query_selector_all("xpath=//a[contains(@href,'.pdf')]")
+                if len(pdfs) == 0:
+                    print ("No pdfs found for order", orderid)
+                    detail_page.close()
+                    continue
+                pdf_i = 0
+                for pdf in pdfs:
+                    pdf_i += 1
+                    file_name = f"{target_dir}/{date_str}_{total}_amazon_{orderid}_{pdf_i}.pdf"
+                    if os.path.isfile(file_name):
+                        print(f"File [{file_name}] already exists")
+                        continue
+                    with detail_page.expect_download() as download_info:
+                        pdf.click(modifiers=["Alt", ])
+                    download = download_info.value
+                    download.save_as(file_name)
+                detail_page.close()
 
     # Close the browser
     context.close()
-    browser.close()
+    # browser.close()
 
 
 def amazon_invoice_downloader():
