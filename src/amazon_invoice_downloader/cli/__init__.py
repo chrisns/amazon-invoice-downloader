@@ -155,7 +155,7 @@ def run(playwright, args):
                 pdfs = detail_page.locator("xpath=//a[contains(@href,'.pdf')]").all()
                 if len(pdfs) == 0:
                     print ("No pdfs found for order", orderid)
-                    detail_page.close()
+                    # detail_page.close()
                     continue
                 pdf_i = 0
                 for pdf in pdfs:
