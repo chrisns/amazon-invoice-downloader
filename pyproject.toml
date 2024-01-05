@@ -24,6 +24,7 @@ classifiers = [
   "Programming Language :: Python :: Implementation :: CPython",
   "Programming Language :: Python :: Implementation :: PyPy",
 ]
+[tool.hatch.metadata]
 dependencies = [
   "docopt~=0.6.2",
   "playwright~=1.40.1"

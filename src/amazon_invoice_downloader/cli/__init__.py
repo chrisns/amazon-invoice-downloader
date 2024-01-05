@@ -96,7 +96,8 @@ def run(playwright, args):
     # sleep()
 
     # Get a list of years from the select options
-    select = page.query_selector('select#time-filter')
+    select = page.locator('select#time-filter')
+    # select = page.get_by_role("select", name="timeFilter").click()
     years = select.inner_text().split("\n")  # skip the first two text options
 
     # Filter years to include only numerical years (YYYY)
@@ -109,7 +110,7 @@ def run(playwright, args):
     # Year Loop (Run backwards through the time range from years to pages to orders)
     for year in years:
         # Select the year in the order filter
-        page.query_selector('span.a-dropdown-container').click()  # Time Range Dropdown Filter
+        page.locator('span.a-dropdown-container').click()  # Time Range Dropdown Filter
         page.get_by_role("option", name=year).click()  # Select the year (descending order, most recent first)
         # sleep()
         page.wait_for_selector('ul.a-pagination')
@@ -123,7 +124,7 @@ def run(playwright, args):
                 if first_page:
                     first_page = False
                 else:
-                    page.query_selector('ul.a-pagination li.a-last a').click()
+                    page.locator('ul.a-pagination li.a-last a').click()
                 # sleep()  # sleep after every page load
             except TimeoutError:
                 # There are no more pages
@@ -132,14 +133,14 @@ def run(playwright, args):
             # Order Loop
             page.wait_for_selector('ul.a-pagination')
             page.wait_for_selector('.js-order-card .yohtmlc-order-id .value')
-            order_cards = page.query_selector_all(".js-order-card")
-            for order_card in order_cards:
+            order_cards = page.locator(".js-order-card")
+            for order_card in order_cards.all():
                 # Parse the order card to create the date and file_name
-                spans = order_card.query_selector_all("span")
+                spans = order_card.locator("span").all()
                 date = datetime.strptime(spans[1].inner_text(), "%d %B %Y")
                 total = spans[3].inner_text().replace("$", "").replace(",", "").replace("£", "")  # remove dollar sign and commas
                 # orderid = spans[9].inner_text()
-                orderid = order_card.query_selector(".yohtmlc-order-id .value").inner_text()
+                orderid = order_card.locator(".yohtmlc-order-id .value").inner_text()
                 date_str = date.strftime("%Y%m%d")
 
                 if date > end_date:
@@ -151,7 +152,7 @@ def run(playwright, args):
                 detail_page = context.new_page()
                 detail_page.goto(f"https://www.amazon.co.uk/gp/shared-cs/ajax/invoice/invoice.html?orderId={orderid}&relatedRequestId=NEEDED")
 
-                pdfs = detail_page.query_selector_all("xpath=//a[contains(@href,'.pdf')]")
+                pdfs = detail_page.locator("xpath=//a[contains(@href,'.pdf')]").all()
                 if len(pdfs) == 0:
                     print ("No pdfs found for order", orderid)
                     detail_page.close()
