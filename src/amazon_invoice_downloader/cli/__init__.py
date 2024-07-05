@@ -30,6 +30,7 @@ Examples:
   amazon-invoice-downloader.py --email=user@example.com --password=secret --date-range=20220101-20221231
 """
 
+import re
 from amazon_invoice_downloader.__about__ import __version__
 
 from playwright.sync_api import sync_playwright, TimeoutError
@@ -57,7 +58,7 @@ def run(playwright, args):
     password = args.get('--password')
     if password == '$AMAZON_PASSWORD':
         password = os.environ.get('AMAZON_PASSWORD')
-    
+
     # date_format = args.get('--email')
     # if date_format == '$AMAZON_DATE_FORMAT':
     #     date_format = os.environ.get('AMAZON_DATE_FORMAT')
@@ -90,7 +91,6 @@ def run(playwright, args):
 
     page = context.new_page()
     page.goto("https://www.amazon.co.uk/gp/css/order-history")
-
 
     # page.wait_for_selector('a >> text=Returns & Orders', timeout=0).click()
     # sleep()
@@ -132,7 +132,7 @@ def run(playwright, args):
 
             # Order Loop
             page.wait_for_selector('ul.a-pagination')
-            page.wait_for_selector('.js-order-card .yohtmlc-order-id .value')
+            page.wait_for_selector('.js-order-card .yohtmlc-order-id')
             order_cards = page.locator(".js-order-card")
             for order_card in order_cards.all():
                 # Parse the order card to create the date and file_name
@@ -140,7 +140,7 @@ def run(playwright, args):
                 date = datetime.strptime(spans[1].inner_text(), "%d %B %Y")
                 total = spans[3].inner_text().replace("$", "").replace(",", "").replace("£", "")  # remove dollar sign and commas
                 # orderid = spans[9].inner_text()
-                orderid = order_card.locator(".yohtmlc-order-id .value").inner_text()
+                orderid = order_card.locator(".yohtmlc-order-id").inner_text().lower().replace("order #", "").strip()
                 date_str = date.strftime("%Y%m%d")
 
                 if date > end_date:
