@@ -33,7 +33,7 @@ The script will skip downloading a file if it already exists in the `./downloads
 ## Usage
 
 ```console
-$ /Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome --remote-debugging-port=9223
+$ /Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome --remote-debugging-port=9223 --remote-debugging-address=0.0.0.0
 $ hatch run pip install -e .
 $ hatch run amazon-invoice-downloader --year 2023
 
